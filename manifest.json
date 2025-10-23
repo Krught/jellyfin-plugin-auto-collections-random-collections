@@ -10,11 +10,11 @@
         "versions": [
             {
                 "version": "1.0.0",
-                "changelog": "- Initial release\n- Random collection selection for home screen\n- Configurable number of collections (1-20)\n- Per-user caching to reduce frequent changes\n- Smart refresh on server restart and page reload\n",
+                "changelog": "- See the full changelog at [GitHub](https://github.com/Krught/jellyfin-plugin-auto-collections-random-collections/releases/tag/v1.0.0)\n",
                 "targetAbi": "10.9.0.0",
                 "sourceUrl": "https://github.com/Krught/jellyfin-plugin-auto-collections-random-collections/releases/download/v1.0.0/auto-collections-random-collections-1.0.0.zip",
-                "checksum": "00000000000000000000000000000000",
-                "timestamp": "2025-10-23T00:00:00Z"
+                "checksum": "30d2f2e4f9fda222cae0a73d7c7b57ca",
+                "timestamp": "2025-10-23T21:20:59.502Z"
             }
         ]
     }
