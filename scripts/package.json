@@ -1,0 +1,13 @@
+{
+  "name": "jellyfin-plugin-scripts",
+  "version": "1.0.0",
+  "description": "Build and release scripts for Auto Collections Random Collections plugin",
+  "private": true,
+  "scripts": {
+    "update-version": "node update-version.js",
+    "update-manifest": "node validate-and-update-manifest.js"
+  },
+  "author": "Krught",
+  "license": "MIT"
+}
+

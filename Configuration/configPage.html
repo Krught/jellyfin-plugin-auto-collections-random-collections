@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Random Collections Home Configuration</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            padding: 20px;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #00a4dc;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #b0b0b0;
+        }
+        input[type="number"] {
+            width: 100%;
+            max-width: 200px;
+            padding: 10px;
+            background-color: #2d2d2d;
+            border: 1px solid #404040;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #00a4dc;
+        }
+        .help-text {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #808080;
+        }
+        .btn {
+            background-color: #00a4dc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .btn:hover {
+            background-color: #0088b8;
+        }
+        .btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .status.success {
+            background-color: #1a4d3a;
+            color: #4ade80;
+            display: block;
+        }
+        .status.error {
+            background-color: #4d1a1a;
+            color: #de4a4a;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Random Collections Home</h1>
+        
+        <div class="form-group">
+            <label for="randomCount">Number of Random Collections</label>
+            <input type="number" id="randomCount" min="1" max="20" value="3" />
+            <div class="help-text">
+                The number of random collections to display on the home screen (1-20).
+                Collections will be randomly selected each time the home screen loads.
+            </div>
+        </div>
+
+        <button class="btn" onclick="saveSettings()">Save Settings</button>
+        
+        <div id="statusMessage" class="status"></div>
+    </div>
+
+    <script>
+        // Load current settings
+        window.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+        });
+
+        function loadSettings() {
+            fetch('/Plugins/RandomCollectionsHome/Configuration', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.RandomCount) {
+                    document.getElementById('randomCount').value = data.RandomCount;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading settings:', error);
+            });
+        }
+
+        function saveSettings() {
+            const randomCount = parseInt(document.getElementById('randomCount').value);
+            
+            if (randomCount < 1 || randomCount > 20) {
+                showStatus('Please enter a number between 1 and 20', 'error');
+                return;
+            }
+
+            const settings = {
+                RandomCount: randomCount
+            };
+
+            fetch('/Plugins/RandomCollectionsHome/Configuration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => {
+                if (response.ok) {
+                    showStatus('Settings saved successfully!', 'success');
+                } else {
+                    showStatus('Error saving settings', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving settings:', error);
+                showStatus('Error saving settings', 'error');
+            });
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+            
+            setTimeout(() => {
+                statusDiv.className = 'status';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
+
+

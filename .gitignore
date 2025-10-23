@@ -1,0 +1,95 @@
+## Build results (GitHub Actions will build these)
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+## Build artifacts
+*.dll
+*.pdb
+*.exe
+*.cache
+
+## Release artifacts (GitHub Actions will create these)
+*.zip
+*.nupkg
+*.snupkg
+release/
+dist/
+publish/
+
+## NuGet packages (will be restored during build)
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Visual Studio / Visual Studio Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+.ionide/
+
+## JetBrains Rider
+.idea/
+*.sln.iml
+.idea_modules/
+
+## Node modules (for scripts)
+node_modules/
+package-lock.json
+yarn.lock
+
+## OS Files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+## Temporary files
+*.tmp
+*.temp
+*.log
+*.swp
+*~
+.#*
+
+## Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+
+## Publish profiles (may contain sensitive data)
+*.pubxml
+*.publishproj
+
+## Local development files
+*.local
+appsettings.Development.json
+.env
+.env.local

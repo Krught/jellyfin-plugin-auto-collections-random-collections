@@ -1,0 +1,78 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Build
+      run: dotnet build -c Release
+      
+    - name: Extract version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+    - name: Create release package
+      run: |
+        mkdir -p release
+        cd release
+        cp ../bin/Release/net8.0/RandomCollectionsHome.dll .
+        zip auto-collections-random-collections-${{ steps.get_version.outputs.VERSION }}.zip RandomCollectionsHome.dll
+        cd ..
+        
+    - name: Calculate checksum
+      id: checksum
+      run: |
+        cd release
+        CHECKSUM=$(md5sum auto-collections-random-collections-${{ steps.get_version.outputs.VERSION }}.zip | awk '{print $1}')
+        echo "MD5=$CHECKSUM" >> $GITHUB_OUTPUT
+        cd ..
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Update manifest
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
+        FILE: auto-collections-random-collections-${{ steps.get_version.outputs.VERSION }}.zip
+        GITHUB_REPO: ${{ github.repository }}
+      run: |
+        cp release/$FILE .
+        node scripts/validate-and-update-manifest.js
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/auto-collections-random-collections-${{ steps.get_version.outputs.VERSION }}.zip
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Commit manifest changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add manifest.json
+        git diff --staged --quiet || git commit -m "Update manifest for release ${{ steps.get_version.outputs.VERSION }}"
+        
+    - name: Push manifest changes
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: main
+
