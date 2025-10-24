@@ -1,7 +1,7 @@
 {
   "name": "jellyfin-plugin-scripts",
   "version": "1.0.0",
-  "description": "Build and release scripts for Auto Collections Random Collections plugin",
+  "description": "Build and release scripts for Home Sections Random Collections plugin",
   "private": true,
   "scripts": {
     "update-version": "node update-version.js",

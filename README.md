@@ -1,4 +1,4 @@
-# Auto-Collections-Random-Collections
+# Home Sections Random Collections
 
 A Jellyfin plugin that randomly displays collections on your home screen, keeping your content fresh and interesting every time you visit!
 
@@ -20,7 +20,6 @@ This plugin automatically selects random collections from your library and displ
 
 - Jellyfin Server **10.9.0 or higher**
 - **HomeScreenSections Plugin** (required for displaying sections on home screen)
-- **jellyfin-plugin-collection-sections**
 
 ---
 
@@ -48,16 +47,16 @@ Add this plugin's repository to your Jellyfin server:
 2. Click the **⚙️** button to modify repositories
 2. Click the **"+"** button to add a new repository
 3. Enter the following details:
-   - **Repository Name**: `@Krught (Auto Collections Random Collections)`
-   - **Repository URL**: `https://raw.githubusercontent.com/Krught/jellyfin-plugin-auto-collections-random-collections/refs/heads/main/manifest.json`
+   - **Repository Name**: `@Krught (Home Sections Random Collections)`
+   - **Repository URL**: `https://raw.githubusercontent.com/Krught/jellyfin-plugin-home-sections-random-collections/refs/heads/main/manifest.json`
 4. Click **Save**
 
-#### Step 3: Install Auto-Collections-Random-Collections
+#### Step 3: Install Home Sections Random Collections
 
 Now install this plugin:
 
 1. Go to **Dashboard** → **Plugins** → **Catalog**
-2. Search for **"Auto Collections Random Collections"**
+2. Search for **"Home Sections Random Collections"**
 3. Click the **Install** button
 4. Wait for installation to complete
 
@@ -73,13 +72,13 @@ Now install this plugin:
 1. Go to **Dashboard** → **Plugins** → **My Plugins**
 2. Verify both plugins are listed and "Active":
    - ✅ **HomeScreenSections**
-   - ✅ **Auto Collections Random Collections**
+   - ✅ **Home Sections Random Collections**
 3. If either shows as disabled, click on it, enable it, and restart again
 
 #### Step 6: Configure the Plugin (Optional)
 
 1. In **Dashboard** → **Plugins** → **My Plugins**
-2. Click on **Auto Collections Random Collections**
+2. Click on **Home Sections Random Collections**
 3. Set **Number of Random Collections** (default is 3, you can choose any number)
 4. Click **Save Settings**
 
@@ -88,7 +87,7 @@ Now install this plugin:
 1. Navigate to your **Home Screen**
 2. You should now see random collections appearing as sections!
 3. Check the **Jellyfin logs** (Dashboard → Logs) for detailed information:
-   - Look for "Random Collections Home plugin initialized"
+   - Look for "Home Sections Random Collections plugin initialized"
    - See which collections were found: "Available collection: '{Name}'"
    - Verify sections were registered: "Successfully registered section for collection '{Name}'"
 
@@ -105,7 +104,7 @@ Now install this plugin:
 
 1. Log in to Jellyfin as an administrator
 2. Go to **Dashboard** → **Plugins** → **My Plugins**
-3. Click on **Auto-Collections-Random-Collections**
+3. Click on **Home Sections Random Collections**
 4. Adjust the settings (see below)
 5. Click **Save**
 6. **Restart your server** for changes to take effect
@@ -144,7 +143,7 @@ Collections use smart caching per user:
 
 **Check 2: Is the plugin installed and enabled?**
 1. Go to **Dashboard** → **Plugins** → **My Plugins**
-2. Verify **Auto Collections Random Collections** is listed and "Active"
+2. Verify **Home Sections Random Collections** is listed and "Active"
 3. If disabled, click on it, enable it, and restart your server
 
 **Check 3: Did you restart after installation?**
@@ -189,8 +188,8 @@ If you can't find the plugin in the Jellyfin catalog after adding the repository
 
 **Option 2: Verify Repository Was Added**
 1. Go to **Dashboard** → **Plugins** → **Repositories**
-2. Check that you see the repository: `@Krught (Auto Collections Random Collections)`
-3. Verify the URL is correct: `https://raw.githubusercontent.com/Krught/jellyfin-plugin-auto-collections-random-collections/refs/heads/main/manifest.json`
+2. Check that you see the repository: `@Krught (Home Sections Random Collections)`
+3. Verify the URL is correct: `https://raw.githubusercontent.com/Krught/jellyfin-plugin-home-sections-random-collections/refs/heads/main/manifest.json`
 4. If missing or incorrect, add it again following Step 2 of the installation
 
 **Option 3: Manual Installation**
@@ -199,7 +198,7 @@ If you can't find the plugin in the Jellyfin catalog after adding the repository
    - **Windows**: `C:\ProgramData\Jellyfin\Server\plugins\`
    - **Linux**: `/var/lib/jellyfin/plugins/`
    - **Docker**: `/config/plugins/` (inside the container)
-3. Create a folder called `Auto-Collections-Random-Collections` if it doesn't exist
+3. Create a folder called `Home-Sections-Random-Collections` if it doesn't exist
 4. Copy the `.dll` file into that folder
 5. Restart your Jellyfin server
 6. Continue with Step 1 above to install HomeScreenSections
@@ -288,7 +287,7 @@ If you want to build this plugin yourself (for development or customization):
 1. **Clone the repository:**
    ```bash
    git clone <repository-url>
-   cd jellyfin-plugin-auto-collections-random-collections
+   cd jellyfin-plugin-home-sections-random-collections
    ```
 
 2. **Build the plugin:**

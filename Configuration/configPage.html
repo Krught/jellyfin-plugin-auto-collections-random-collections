@@ -26,27 +26,118 @@
                     color: #de4a4a;
                     display: block;
                 }
+                .debugSection {
+                    display: none;
+                    margin-top: 20px;
+                    padding: 15px;
+                    background-color: rgba(0, 0, 0, 0.2);
+                    border-radius: 4px;
+                    border-left: 3px solid #4ade80;
+                }
+                .debugSection.visible {
+                    display: block;
+                }
+                .debugSection h3 {
+                    margin-top: 0;
+                    margin-bottom: 15px;
+                    color: #4ade80;
+                }
+                .sectionItem {
+                    padding: 10px;
+                    margin-bottom: 10px;
+                    background-color: rgba(255, 255, 255, 0.05);
+                    border-radius: 4px;
+                    font-family: monospace;
+                    font-size: 0.9em;
+                }
+                .sectionItem strong {
+                    color: #4ade80;
+                }
+                .buttonContainer {
+                    display: flex;
+                    gap: 10px;
+                    margin-bottom: 10px;
+                }
             </style>
 
             <form id="randomCollectionsConfigForm">
-                <h1>Random Collections Home Configuration</h1>
+                <h1>Home Sections Random Collections Configuration</h1>
                 
                 <div class="inputContainer">
                     <label class="inputLabel" for="randomCount">Number of Random Collections:</label>
                     <input is="emby-input" type="number" id="randomCount" name="randomCount" min="1" value="3" />
                     <div class="fieldDescription">
                         The number of random collections to return via the API (default is 3).
-                        Each user will get their own set of random collections.
                     </div>
                 </div>
 
-                <div>
-                    <button is="emby-button" type="submit" class="raised button-submit block">
+                <div class="inputContainer">
+                    <label class="inputLabel">View Modes:</label>
+                    <div class="fieldDescription">
+                        Select which view modes to use for displaying collections. If only one is selected, all collections will use that mode. If multiple are selected, modes will be randomly chosen from the selected options.
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <label style="display: block; margin-bottom: 8px;">
+                            <input type="checkbox" id="usePortrait" name="usePortrait" checked />
+                            Portrait
+                        </label>
+                        <label style="display: block; margin-bottom: 8px;">
+                            <input type="checkbox" id="useSquare" name="useSquare" checked />
+                            Square
+                        </label>
+                        <label style="display: block; margin-bottom: 8px;">
+                            <input type="checkbox" id="useLandscape" name="useLandscape" checked />
+                            Landscape
+                        </label>
+                    </div>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel">Collection Items:</label>
+                    <div class="fieldDescription">
+                        The number of items to display in each collection. (default is 20, 0 will display all items).
+                    </div>
+                    <input is="emby-input" type="number" id="collectionLimit" name="collectionLimit" min="0" value="20" />
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel">Collection Update Interval:</label>
+                    <div class="fieldDescription">
+                        The interval in minutes to update the collections. (default is 24 hour).
+                    </div>
+                    <input is="emby-input" type="number" id="collectionUpdateInterval" name="collectionUpdateInterval" min="0" value="1440" />
+                </div>
+
+                <div class="buttonContainer">
+                    <button is="emby-button" type="submit" class="raised button-submit" style="flex: 1;">
                         <span>Save</span>
+                    </button>
+                    <button is="emby-button" type="button" class="raised" style="flex: 1; background-color: #4ade80;" onclick="rerandomizeSections()">
+                        <span>Rerandomize Sections</span>
                     </button>
                 </div>
                 
                 <div id="statusMessage" class="status"></div>
+                
+                <div class="inputContainer" style="margin-top: 30px;">
+                    <label style="display: block;">
+                        <input type="checkbox" id="developerMode" name="developerMode" onchange="toggleDeveloperMode()" />
+                        Developer Mode
+                    </label>
+                    <div class="fieldDescription">
+                        Show debug information about current sections being generated.
+                    </div>
+                </div>
+                
+                <div id="debugSection" class="debugSection">
+                    <h3>Current Sections Debug Info</h3>
+                    <div id="debugContent">
+                        <p style="opacity: 0.7;">Click "Load Debug Info" to see current sections...</p>
+                    </div>
+                    <button is="emby-button" type="button" class="raised" style="margin-top: 10px;" onclick="loadDebugInfo()">
+                        <span>Load Debug Info</span>
+                    </button>
+                </div>
             </form>
 
             <script type="text/javascript">
@@ -61,6 +152,11 @@
                 function loadSettings() {
                     ApiClient.getPluginConfiguration(pluginId).then(function(config) {
                         document.getElementById('randomCount').value = config.RandomCount || 3;
+                        document.getElementById('usePortrait').checked = config.UsePortrait !== false; // default true
+                        document.getElementById('useSquare').checked = config.UseSquare !== false; // default true
+                        document.getElementById('useLandscape').checked = config.UseLandscape !== false; // default true
+                        document.getElementById('collectionLimit').value = config.CollectionLimit || 20;
+                        document.getElementById('collectionUpdateInterval').value = config.CollectionUpdateInterval || 1440;
                     }).catch(function(error) {
                         console.error('Error loading settings:', error);
                     });
@@ -70,19 +166,55 @@
                     Dashboard.showLoadingMsg();
                     
                     var randomCount = parseInt(document.getElementById('randomCount').value);
+                    var usePortrait = document.getElementById('usePortrait').checked;
+                    var useSquare = document.getElementById('useSquare').checked;
+                    var useLandscape = document.getElementById('useLandscape').checked;
+                    var collectionLimit = parseInt(document.getElementById('collectionLimit').value);
+                    var collectionUpdateInterval = parseInt(document.getElementById('collectionUpdateInterval').value);
                     
                     if (randomCount < 1) {
                         Dashboard.hideLoadingMsg();
                         showStatus('Please enter a number of 1 or greater', 'error');
                         return;
                     }
+                    
+                    // Validate at least one video mode is selected
+                    if (!usePortrait && !useSquare && !useLandscape) {
+                        Dashboard.hideLoadingMsg();
+                        showStatus('Please select at least one video mode', 'error');
+                        return;
+                    }
+                    
+                    // Validate collection limit
+                    if (collectionLimit < 0) {
+                        Dashboard.hideLoadingMsg();
+                        showStatus('Collection limit must be 0 or greater', 'error');
+                        return;
+                    }
+                    
+                    // Validate collection update interval
+                    if (collectionUpdateInterval < 0) {
+                        Dashboard.hideLoadingMsg();
+                        showStatus('Collection update interval must be 0 or greater', 'error');
+                        return;
+                    }
 
                     ApiClient.getPluginConfiguration(pluginId).then(function(config) {
                         config.RandomCount = randomCount;
+                        config.UsePortrait = usePortrait;
+                        config.UseSquare = useSquare;
+                        config.UseLandscape = useLandscape;
+                        config.CollectionLimit = collectionLimit;
+                        config.CollectionUpdateInterval = collectionUpdateInterval;
                         
                         ApiClient.updatePluginConfiguration(pluginId, config).then(function(result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
-                            showStatus('Settings saved successfully! Changes will take effect immediately.', 'success');
+                            showStatus('Settings saved successfully! Refreshing page...', 'success');
+                            
+                            // Refresh page after a short delay to show the success message
+                            setTimeout(function() {
+                                window.location.reload();
+                            }, 1000);
                         }).catch(function(error) {
                             Dashboard.hideLoadingMsg();
                             console.error('Error saving settings:', error);
@@ -103,6 +235,71 @@
                     setTimeout(function() {
                         statusDiv.className = 'status';
                     }, 5000);
+                }
+
+                function toggleDeveloperMode() {
+                    var debugSection = document.getElementById('debugSection');
+                    var isChecked = document.getElementById('developerMode').checked;
+                    
+                    if (isChecked) {
+                        debugSection.classList.add('visible');
+                    } else {
+                        debugSection.classList.remove('visible');
+                    }
+                }
+
+                function rerandomizeSections() {
+                    Dashboard.showLoadingMsg();
+                    
+                    ApiClient.fetch({
+                        type: 'POST',
+                        url: ApiClient.getUrl('RandomCollections/Refresh')
+                    }).then(function(response) {
+                        Dashboard.hideLoadingMsg();
+                        showStatus('Sections re-randomized successfully! Refreshing page...', 'success');
+                        
+                        // Refresh page after a short delay to show the success message
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                    }).catch(function(error) {
+                        Dashboard.hideLoadingMsg();
+                        console.error('Error rerandomizing sections:', error);
+                        showStatus('Error rerandomizing sections: ' + error, 'error');
+                    });
+                }
+
+                function loadDebugInfo() {
+                    var debugContent = document.getElementById('debugContent');
+                    debugContent.innerHTML = '<p style="opacity: 0.7;">Loading debug information...</p>';
+                    
+                    ApiClient.fetch({
+                        type: 'GET',
+                        url: ApiClient.getUrl('RandomCollections/Debug/Sections')
+                    }).then(function(response) {
+                        return response.json();
+                    }).then(function(sections) {
+                        if (!sections || sections.length === 0) {
+                            debugContent.innerHTML = '<p style="opacity: 0.7;">No sections found.</p>';
+                            return;
+                        }
+                        
+                        var html = '';
+                        sections.forEach(function(section) {
+                            html += '<div class="sectionItem">';
+                            html += '<strong>Section ID:</strong> ' + section.SectionId + '<br>';
+                            html += '<strong>Collection Name:</strong> ' + section.CollectionName + '<br>';
+                            html += '<strong>Collection ID:</strong> ' + section.CollectionId + '<br>';
+                            html += '<strong>View Mode:</strong> ' + section.ViewMode + '<br>';
+                            html += '<strong>Item Count:</strong> ' + section.ItemCount;
+                            html += '</div>';
+                        });
+                        
+                        debugContent.innerHTML = html;
+                    }).catch(function(error) {
+                        console.error('Error loading debug info:', error);
+                        debugContent.innerHTML = '<p style="color: #de4a4a;">Error loading debug information: ' + error + '</p>';
+                    });
                 }
 
                 // Load settings when page is ready

@@ -1,6 +1,6 @@
 export VERSION := 1.0.0
-export GITHUB_REPO := Krught/jellyfin-plugin-auto-collections-random-collections
-export FILE := auto-collections-random-collections-${VERSION}.zip
+export GITHUB_REPO := Krught/jellyfin-plugin-home-sections-random-collections
+export FILE := home-sections-random-collections-${VERSION}.zip
 
 build:
 	dotnet build -c Release

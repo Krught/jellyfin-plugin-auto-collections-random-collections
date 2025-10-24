@@ -17,12 +17,18 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
         private static ILibraryManager? _libraryManager;
         private static IDtoService? _dtoService;
         private static ILogger? _logger;
+        private static PluginConfiguration? _configuration;
 
         public static void SetLibraryManager(ILibraryManager libraryManager, IDtoService dtoService, ILogger logger)
         {
             _libraryManager = libraryManager;
             _dtoService = dtoService;
             _logger = logger;
+        }
+
+        public static void SetConfiguration(PluginConfiguration configuration)
+        {
+            _configuration = configuration;
         }
 
         public static QueryResult<BaseItemDto> GetCollectionItems(object payload)
@@ -114,8 +120,9 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
                 // Get items within the collection
                 // For BoxSet collections, we need to get the children directly from the collection
                 // not by ParentId query, as collection items are linked, not actual children
+                var collectionLimit = _configuration?.CollectionLimit ?? 20;
                 var items = collection is MediaBrowser.Controller.Entities.Folder folder
-                    ? folder.GetRecursiveChildren().Take(20).ToList()
+                    ? (collectionLimit > 0 ? folder.GetRecursiveChildren().Take(collectionLimit).ToList() : folder.GetRecursiveChildren().ToList())
                     : new List<BaseItem>();
 
                 if (_dtoService == null)

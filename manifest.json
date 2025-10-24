@@ -1,26 +1,18 @@
 [
     {
         "guid": "d9e7b57d-d417-4f0f-8ff9-4a6de3f42eab",
-        "name": "Auto Collections Random Collections",
+        "name": "Home Sections Random Collections",
         "overview": "Randomly displays collections on the Jellyfin home screen",
         "description": "Adds random collections to your home screen. Access random collections via the API endpoint. Configurable number of collections with per-user caching to reduce frequent changes. Includes comprehensive logging for troubleshooting.",
         "owner": "Krught",
-        "imageUrl": "",
+        "imageUrl": "https://raw.githubusercontent.com/Krught/jellyfin-plugin-home-sections-random-collections/main/logo.png",
         "category": "General",
         "versions": [
             {
-                "version": "1.0.1",
-                "changelog": "- Fixed configuration page registration\n- Added proper logging with ILogger\n- Standalone API controller for accessing random collections\n- Removed HomeScreenSections dependency\n- Added REST API endpoints: /RandomCollections/Get, /RandomCollections/Items/{id}, /RandomCollections/Refresh\n- Enhanced error handling and diagnostics\n",
-                "targetAbi": "10.9.0.0",
-                "sourceUrl": "https://github.com/Krught/jellyfin-plugin-auto-collections-random-collections/releases/download/v1.0.1/auto-collections-random-collections-1.0.1.zip",
-                "checksum": "00000000000000000000000000000000",
-                "timestamp": "2025-10-23T00:00:00Z"
-            },
-            {
                 "version": "1.0.0",
-                "changelog": "- See the full changelog at [GitHub](https://github.com/Krught/jellyfin-plugin-auto-collections-random-collections/releases/tag/v1.0.0)\n",
+                "changelog": "- See the full changelog at [GitHub](https://github.com/Krught/jellyfin-plugin-home-sections-random-collections/releases/tag/v1.0.0)\n",
                 "targetAbi": "10.9.0.0",
-                "sourceUrl": "https://github.com/Krught/jellyfin-plugin-auto-collections-random-collections/releases/download/v1.0.0/auto-collections-random-collections-1.0.0.zip",
+                "sourceUrl": "https://github.com/Krught/jellyfin-plugin-home-sections-random-collections/releases/download/v1.0.0/home-sections-random-collections-1.0.0.zip",
                 "checksum": "30d2f2e4f9fda222cae0a73d7c7b57ca",
                 "timestamp": "2025-10-23T21:20:59.502Z"
             }

@@ -102,12 +102,52 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
             {
                 _logger.LogInformation("Refreshing random collections cache");
                 
-                // This will be handled by getting new random collections
-                return Ok(new { message = "Cache cleared. New collections will be selected on next request." });
+                if (Plugin.Instance == null)
+                {
+                    _logger.LogError("Plugin instance is null");
+                    return StatusCode(500, "Plugin not initialized");
+                }
+                
+                // Get user ID from the authenticated request
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userId = string.IsNullOrEmpty(userIdClaim) ? Guid.Empty : Guid.Parse(userIdClaim);
+                
+                // Clear cache and re-register sections
+                Plugin.Instance.ClearCacheAndReregister(userId);
+                
+                return Ok(new { message = "Cache cleared and sections re-registered successfully!" });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error refreshing collections");
+                return StatusCode(500, ex.Message);
+            }
+        }
+        
+        /// <summary>
+        /// Gets current section information for debugging
+        /// </summary>
+        [HttpGet("Debug/Sections")]
+        public ActionResult<object> GetDebugSections()
+        {
+            try
+            {
+                if (Plugin.Instance == null)
+                {
+                    return StatusCode(500, "Plugin not initialized");
+                }
+                
+                // Get user ID from the authenticated request
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userId = string.IsNullOrEmpty(userIdClaim) ? Guid.Empty : Guid.Parse(userIdClaim);
+                
+                var sections = Plugin.Instance.GetCurrentSections(userId);
+                
+                return Ok(sections);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting debug sections");
                 return StatusCode(500, ex.Message);
             }
         }

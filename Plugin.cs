@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Loader;
-using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Controller.Entities;
@@ -15,23 +15,22 @@ using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 using Jellyfin.Data.Enums;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Jellyfin.Plugin.RandomCollectionsHome
 {
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
-        public override string Name => "Auto Collections Random Collections";
+        public override string Name => "Home Sections Random Collections";
         public override Guid Id => Guid.Parse("d9e7b57d-d417-4f0f-8ff9-4a6de3f42eab");
         public override string Description => "Adds random collections to the home screen each time it loads.";
 
+        private readonly IApplicationPaths _applicationPaths;
         private readonly ILibraryManager _libraryManager;
         private readonly IDtoService _dtoService;
         private readonly ILogger<Plugin> _logger;
         private readonly Dictionary<Guid, List<Guid>> _userCache = new Dictionary<Guid, List<Guid>>();
         private readonly object _cacheLock = new object();
-        private static readonly HttpClient _httpClient = new HttpClient();
 
         public static Plugin? Instance { get; private set; }
 
@@ -44,12 +43,14 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
             : base(applicationPaths, xmlSerializer)
         {
             Instance = this;
+            _applicationPaths = applicationPaths;
             _libraryManager = libraryManager;
             _dtoService = dtoService;
             _logger = logger;
             RandomCollectionsHandler.SetLibraryManager(_libraryManager, _dtoService, _logger);
+            RandomCollectionsHandler.SetConfiguration(Configuration);
             
-            _logger.LogInformation("Random Collections Home plugin initialized");
+            _logger.LogInformation("Home Sections Random Collections plugin initialized");
             
             // Log available collections count and register sections with delay
             try
@@ -87,7 +88,11 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
         {
             base.UpdateConfiguration(configuration);
             
-            _logger.LogInformation("Configuration updated. RandomCount: {Count}", Configuration.RandomCount);
+            _logger.LogInformation("Configuration updated. RandomCount: {Count}, CollectionLimit: {Limit}, CollectionUpdateInterval: {Interval}", 
+                Configuration.RandomCount, Configuration.CollectionLimit, Configuration.CollectionUpdateInterval);
+            
+            // Update handler configuration
+            RandomCollectionsHandler.SetConfiguration(Configuration);
             
             // Clear cache when configuration changes
             lock (_cacheLock)
@@ -165,6 +170,83 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
             {
                 _logger.LogError(ex, "Error getting random collections for user {UserId}", userId);
                 return new List<BaseItem>();
+            }
+        }
+
+        public void ClearCacheAndReregister(Guid userId)
+        {
+            _logger.LogInformation("Clearing cache and re-registering sections for user {UserId}", userId);
+            
+            lock (_cacheLock)
+            {
+                _userCache.Clear();
+            }
+            
+            Task.Run(async () => await RegisterSectionsWithRetry(userId));
+        }
+
+        public List<object> GetCurrentSections(Guid userId)
+        {
+            var collections = GetRandomCollections(userId);
+            var result = new List<object>();
+            
+            int sectionIndex = 1;
+            foreach (var collection in collections)
+            {
+                var numberedId = ConvertNumberToWord(sectionIndex);
+                var uniqueId = $"RANDOM{numberedId}";
+                
+                // Build available view modes based on configuration
+                var availableViewModes = new List<string>();
+                if (Configuration.UsePortrait)
+                    availableViewModes.Add("Portrait");
+                if (Configuration.UseSquare)
+                    availableViewModes.Add("Square");
+                if (Configuration.UseLandscape)
+                    availableViewModes.Add("Landscape");
+                
+                if (availableViewModes.Count == 0)
+                {
+                    availableViewModes = new List<string> { "Portrait", "Landscape", "Square" };
+                }
+                
+                var viewMode = availableViewModes.Count == 1 
+                    ? availableViewModes[0] 
+                    : availableViewModes[Random.Shared.Next(availableViewModes.Count)];
+                
+                result.Add(new
+                {
+                    SectionId = uniqueId,
+                    CollectionName = collection.Name,
+                    CollectionId = collection.Id,
+                    ViewMode = viewMode,
+                    ItemCount = GetItemCount(collection)
+                });
+                
+                sectionIndex++;
+            }
+            
+            return result;
+        }
+
+        private int GetItemCount(BaseItem item)
+        {
+            try
+            {
+                if (item is Folder folder)
+                {
+                    var query = new InternalItemsQuery
+                    {
+                        ParentId = item.Id,
+                        Recursive = true
+                    };
+                    return folder.GetItemList(query).Count;
+                }
+                return 0;
+            }
+            catch
+            {
+                return 0;
             }
         }
 
@@ -305,21 +387,41 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
 
             _logger.LogInformation("Registering {Count} collections as home screen sections", collections.Count);
 
-            // Build sections for configuration POST
-            var configSections = new List<object>();
+            // Collect all sections to update in one batch
+            var sectionsToUpdate = new List<(string sectionId, string collectionName, Guid collectionId, string viewMode)>();
 
-            // Register each collection as a section
+            // Register each collection as a section with RANDOMONE, RANDOMTWO, etc. IDs
+            int sectionIndex = 1;
             foreach (var collection in collections)
             {
-                var uniqueId = collection.Name.Replace(" ", "").Replace("-", "").Replace("_", "").Replace(".", "").Replace("'", "").Replace("\"", "").Replace("&", "");
+                // Use numbered ID pattern like RANDOMONE, RANDOMTWO, etc.
+                var numberedId = ConvertNumberToWord(sectionIndex);
+                var uniqueId = $"RANDOM{numberedId}";
                 
-                var viewModes = new[] { "Portrait", "Landscape", "Square" };
-                var viewMode = viewModes[Random.Shared.Next(viewModes.Length)];
+                // Build available view modes based on configuration
+                var availableViewModes = new List<string>();
+                if (Configuration.UsePortrait)
+                    availableViewModes.Add("Portrait");
+                if (Configuration.UseSquare)
+                    availableViewModes.Add("Square");
+                if (Configuration.UseLandscape)
+                    availableViewModes.Add("Landscape");
+                
+                // If no modes are enabled (shouldn't happen with UI validation, but safety check), default to all
+                if (availableViewModes.Count == 0)
+                {
+                    availableViewModes = new List<string> { "Portrait", "Landscape", "Square" };
+                    _logger.LogWarning("No view modes enabled in configuration, using all modes as fallback");
+                }
+                
+                // Select view mode: if only one enabled, use it; otherwise random from available
+                var viewMode = availableViewModes.Count == 1 
+                    ? availableViewModes[0] 
+                    : availableViewModes[Random.Shared.Next(availableViewModes.Count)];
                 
                 // Create JObject payload as expected by HomeScreenSections specification
                 var payload = new JObject
                 {
-                    // ["id"] = collection.Id,
                     ["id"] = uniqueId,
                     ["displayText"] = collection.Name,
                     ["limit"] = 1,
@@ -332,8 +434,8 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
                     ["SectionViewMode"] = viewMode
                 };
 
-                _logger.LogInformation("Registering section: '{CollectionName}' (ID: {CollectionId})", 
-                    collection.Name, collection.Id);
+                _logger.LogInformation("Registering section: '{CollectionName}' with ID '{UniqueId}' (ViewMode: {ViewMode})", 
+                    collection.Name, uniqueId, viewMode);
                 _logger.LogDebug("Section payload - Assembly: {Assembly}, Class: {Class}, Method: {Method}, Route: {Route}", 
                     payload["resultsAssembly"], payload["resultsClass"], payload["resultsMethod"], payload["route"]);
 
@@ -341,56 +443,120 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
                 
                 _logger.LogInformation("Successfully registered section for collection '{CollectionName}'", collection.Name);
                 
-                // Add to configuration sections list
-                configSections.Add(new
-                {
-                    UniqueId = uniqueId,
-                    DisplayText = collection.Name,
-                    CollectionName = collection.Name,
-                    SectionType = "Collection"
-                });
+                // Add to batch update list
+                sectionsToUpdate.Add((uniqueId, collection.Name, collection.Id, viewMode));
+                sectionIndex++;
             }
 
-            // POST to configuration endpoint
-            // Task.Run(async () => await PostToConfigurationEndpoint(configSections));
+            // Update all sections in the XML config file in one operation
+            if (sectionsToUpdate.Count > 0)
+            {
+                Task.Run(async () => await UpdateAllSectionConfigurations(sectionsToUpdate));
+            }
 
             _logger.LogInformation("Completed registering all home screen sections");
         }
 
-        private async Task PostToConfigurationEndpoint(List<object> sections)
+        private string ConvertNumberToWord(int number)
         {
+            var words = new[] { "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN",
+                              "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN", "SEVENTEEN", "EIGHTEEN", "NINETEEN", "TWENTY" };
+            
+            if (number >= 1 && number <= words.Length)
+            {
+                return words[number - 1];
+            }
+            
+            // For numbers beyond 20, just use the number itself
+            return number.ToString();
+        }
+
+        private async Task UpdateAllSectionConfigurations(List<(string sectionId, string collectionName, Guid collectionId, string viewMode)> sections)
+        {
+            await Task.CompletedTask; // Make method async-compatible
+            
             try
             {
-                // HomeScreenSections plugin GUID
-                var homeScreenSectionsPluginId = "043b2c48-b3e0-4610-b398-8217b146d1a4";
-                var configEndpoint = $"http://localhost:8096/Plugins/{homeScreenSectionsPluginId}/Configuration";
+                _logger.LogInformation("Attempting to update {Count} section configurations in batch", sections.Count);
                 
-                var configPayload = new
+                // Build path to HomeScreenSections XML config file
+                var pluginConfigPath = Path.Combine(_applicationPaths.PluginConfigurationsPath, "Jellyfin.Plugin.HomeScreenSections.xml");
+                
+                if (!File.Exists(pluginConfigPath))
                 {
-                    Sections = sections
-                };
-
-                var jsonContent = JsonConvert.SerializeObject(configPayload);
-                _logger.LogInformation("POSTing configuration to {Endpoint}", configEndpoint);
-                _logger.LogDebug("Configuration payload: {Payload}", jsonContent);
-
-                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync(configEndpoint, content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    _logger.LogInformation("Successfully posted configuration with {Count} sections", sections.Count);
+                    _logger.LogWarning("HomeScreenSections config file not found at: {Path}", pluginConfigPath);
+                    return;
                 }
-                else
+                
+                _logger.LogDebug("Loading HomeScreenSections config from: {Path}", pluginConfigPath);
+                
+                // Load the XML document
+                XDocument doc = XDocument.Load(pluginConfigPath);
+                
+                if (doc.Root == null)
                 {
-                    var responseBody = await response.Content.ReadAsStringAsync();
-                    _logger.LogWarning("Failed to post configuration. Status: {Status}, Response: {Response}", 
-                        response.StatusCode, responseBody);
+                    _logger.LogWarning("Invalid XML structure in HomeScreenSections config");
+                    return;
                 }
+                
+                // Find or create the SectionSettings parent element
+                var sectionSettingsParent = doc.Root.Element("SectionSettings");
+                if (sectionSettingsParent == null)
+                {
+                    _logger.LogInformation("SectionSettings element not found, creating it");
+                    sectionSettingsParent = new XElement("SectionSettings");
+                    doc.Root.Add(sectionSettingsParent);
+                }
+                
+                // FIRST: Remove all old sections that start with "RANDOM"
+                var existingSections = sectionSettingsParent.Elements("SectionSettings").ToList();
+                var oldRandomSections = existingSections
+                    .Where(s => s.Element("SectionId")?.Value?.StartsWith("RANDOM") == true)
+                    .ToList();
+                
+                if (oldRandomSections.Any())
+                {
+                    _logger.LogInformation("Removing {Count} old RANDOM* sections from config", oldRandomSections.Count);
+                    foreach (var oldSection in oldRandomSections)
+                    {
+                        var oldSectionId = oldSection.Element("SectionId")?.Value;
+                        _logger.LogDebug("Removing old section: {SectionId}", oldSectionId);
+                        oldSection.Remove();
+                    }
+                }
+                
+                // SECOND: Create all new sections with updated settings
+                int createdCount = 0;
+                
+                foreach (var (sectionId, collectionName, collectionId, viewMode) in sections)
+                {
+                    _logger.LogDebug("Creating new section with ID '{SectionId}' for collection '{CollectionName}' (ViewMode: {ViewMode})", 
+                        sectionId, collectionName, viewMode);
+                    
+                    // Create new section element
+                    var newSection = new XElement("SectionSettings",
+                        new XElement("SectionId", sectionId),
+                        new XElement("Enabled", "true"),
+                        new XElement("AllowUserOverride", "false"),
+                        new XElement("LowerLimit", "1"),
+                        new XElement("UpperLimit", "1"),
+                        new XElement("OrderIndex", "999"),
+                        new XElement("ViewMode", viewMode),
+                        new XElement("HideWatchedItems", "false")
+                    );
+                    
+                    sectionSettingsParent.Add(newSection);
+                    createdCount++;
+                }
+                
+                // Save the XML file once
+                doc.Save(pluginConfigPath);
+                _logger.LogInformation("Successfully saved HomeScreenSections config: {Removed} removed, {Created} created", 
+                    oldRandomSections.Count, createdCount);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error posting to configuration endpoint");
+                _logger.LogError(ex, "Error updating section configurations in batch");
             }
         }
 
