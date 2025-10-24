@@ -8,16 +8,19 @@ This plugin automatically selects random collections from your library and displ
 
 ## Features
 
-- 🎲 Randomly displays collections on your home screen
-- ⚙️ Configurable - choose how many collections to show (1-20)
-- 🔄 Auto-refreshes on server restart or page reload
-- 👤 Smart caching prevents too-frequent changes
+- 🎲 Randomly displays collections accessible via API
+- ⚙️ Configurable - choose how many collections to show
+- 🔄 Auto-refreshes with smart caching
+- 👤 Per-user random collection selection  
 - 🎨 Beautiful, easy-to-use configuration interface
+- 📊 REST API endpoints for integration
+- 🔍 Comprehensive logging for troubleshooting
 
 ## Requirements
 
 - Jellyfin Server **10.9.0 or higher**
-- **HomeScreenSections Plugin** (you'll install this alongside this plugin)
+- **HomeScreenSections Plugin** (required for displaying sections on home screen)
+- **jellyfin-plugin-collection-sections**
 
 ---
 
@@ -29,19 +32,20 @@ This is the easiest way to install the plugin!
 
 #### Step 1: Install HomeScreenSections Plugin
 
-This plugin requires HomeScreenSections to work. Install it first:
+This plugin requires HomeScreenSections to display collections on your home screen.
 
 1. Open your Jellyfin web interface and log in as an administrator
 2. Go to **Dashboard** → **Plugins** → **Catalog**
 3. Search for **"HomeScreenSections"**
-4. Click the **Install** button next to it
+4. Click **Install** next to it
 5. Wait for the installation to complete
 
 #### Step 2: Add Custom Repository
 
 Add this plugin's repository to your Jellyfin server:
 
-1. Go to **Dashboard** → **Plugins** → **Repositories**
+1. Go to **Dashboard** → **Plugins** → **Catalog**
+2. Click the **⚙️** button to modify repositories
 2. Click the **"+"** button to add a new repository
 3. Enter the following details:
    - **Repository Name**: `@Krught (Auto Collections Random Collections)`
@@ -53,7 +57,7 @@ Add this plugin's repository to your Jellyfin server:
 Now install this plugin:
 
 1. Go to **Dashboard** → **Plugins** → **Catalog**
-2. Search for **"Auto Collections"** or **"Random Collections"**
+2. Search for **"Auto Collections Random Collections"**
 3. Click the **Install** button
 4. Wait for installation to complete
 
@@ -67,24 +71,31 @@ Now install this plugin:
 #### Step 5: Verify Plugins Are Enabled
 
 1. Go to **Dashboard** → **Plugins** → **My Plugins**
-2. Look for both:
-   - ✅ **HomeScreenSections** - should show as "Active"
-   - ✅ **Auto-Collections-Random-Collections** - should show as "Active"
-4. If either shows as disabled, click on it and enable it, then restart again
+2. Verify both plugins are listed and "Active":
+   - ✅ **HomeScreenSections**
+   - ✅ **Auto Collections Random Collections**
+3. If either shows as disabled, click on it, enable it, and restart again
 
 #### Step 6: Configure the Plugin (Optional)
 
 1. In **Dashboard** → **Plugins** → **My Plugins**
-2. Click on **Auto-Collections-Random-Collections**
-3. Set **Number of Random Collections** (default is 3, you can choose 1-20)
-4. Click **Save**
-5. Restart your server if you changed the setting
+2. Click on **Auto Collections Random Collections**
+3. Set **Number of Random Collections** (default is 3, you can choose any number)
+4. Click **Save Settings**
 
-#### Step 7: Enjoy Your Random Collections!
+#### Step 7: Check Your Home Screen!
 
 1. Navigate to your **Home Screen**
-2. You should now see random collections appearing!
-3. Collections will change on server restart and periodically when you reload the page
+2. You should now see random collections appearing as sections!
+3. Check the **Jellyfin logs** (Dashboard → Logs) for detailed information:
+   - Look for "Random Collections Home plugin initialized"
+   - See which collections were found: "Available collection: '{Name}'"
+   - Verify sections were registered: "Successfully registered section for collection '{Name}'"
+
+**Troubleshooting**: If you don't see sections, check the logs for:
+- "HomeScreenSections plugin not found" → Install HomeScreenSections first
+- "No collections found in library" → Create at least one collection
+- Detailed registration logs will show exactly what happened
 
 ---
 
@@ -102,53 +113,70 @@ Now install this plugin:
 ### Available Settings
 
 **Number of Random Collections**
-- Controls how many random collections appear on your home screen
-- Range: 1 to 20
+- Controls how many random collections are returned by the API
 - Default: 3
-- Example: If set to 5, you'll see 5 different random collections each time
+- Example: If set to 5, the API will return 5 different random collections for each user
 
 ### When Do Collections Update?
 
-Collections will automatically refresh in these situations:
-- When you **restart your Jellyfin server**
-- When you **change the plugin configuration**
-- Periodically when you **reload the home screen** (30% chance each reload to keep things fresh without being too chaotic)
+Collections use smart caching per user:
+- **70% of the time**: Cached collections are returned (prevents excessive randomization)
+- **30% of the time**: New random collections are selected
+- **On configuration change**: Cache is cleared and new collections are selected
+- **Manual refresh**: Use the `/RandomCollections/Refresh` endpoint
 
 ---
 
 ## Troubleshooting
 
-### I Don't See Any Collections on My Home Screen
+### Plugin Settings Page Not Showing
+
+**If clicking the settings button shows "no settings" error:**
+- Make sure you've restarted Jellyfin after installation
+- Check that the plugin is marked as "Active" in My Plugins
+- Check Jellyfin logs for any errors during plugin initialization
+
+### Can't Access the API
 
 **Check 1: Do you have collections?**
-- This plugin only works if you have collections in your Jellyfin library
+- This plugin only works if you have collections (BoxSets) in your Jellyfin library
 - To create a collection: Select some movies/shows → Click **"+"** → **"Add to Collection"** → **"New Collection"**
 
-**Check 2: Are both plugins installed and enabled?**
+**Check 2: Is the plugin installed and enabled?**
 1. Go to **Dashboard** → **Plugins** → **My Plugins**
-2. Verify you see both plugins listed:
-   - **HomeScreenSections** - must be "Active"
-   - **Auto-Collections-Random-Collections** - must be "Active"
-3. If either is missing, return to the [Installation](#installation) section
-4. If either is disabled, click on it, enable it, and restart your server
+2. Verify **Auto Collections Random Collections** is listed and "Active"
+3. If disabled, click on it, enable it, and restart your server
 
 **Check 3: Did you restart after installation?**
 - Jellyfin requires a full server restart after installing plugins
 - Go to **Dashboard** → **Restart**
 
-### Collections Aren't Updating
-
-This is normal behavior! Collections update:
-- ✅ On server restart
-- ✅ When you change the configuration
-- ✅ Occasionally on home screen reload (30% of the time)
-
-**To force new collections to appear:**
+**Check 4: Check if HomeScreenSections is installed**
 1. Go to **Dashboard** → **Plugins** → **My Plugins**
-2. Click **Auto-Collections-Random-Collections**
-3. Change the number of collections (even by 1)
-4. Click **Save**
-5. Restart your server
+2. Look for **HomeScreenSections** plugin
+3. If not installed, go to Catalog and install it
+4. Restart Jellyfin after installing
+
+**Check 5: Look at the logs for detailed information**
+- Go to **Dashboard** → **Logs**
+- Look for messages from this plugin:
+  - `"Found X collections in library"` - Shows detected collections
+  - `"Available collection: 'Name'"` - Lists each collection found
+  - `"Attempting to register home screen sections"` - Shows registration started
+  - `"Successfully registered section for collection 'Name'"` - Confirms registration
+  - `"HomeScreenSections plugin not found"` - Means you need to install it
+- These logs will tell you exactly what the plugin is doing
+
+### Collections Aren't Changing
+
+This is normal behavior! The plugin uses smart caching:
+- ✅ 70% of the time: Returns cached collections (consistent experience)
+- ✅ 30% of the time: Selects new random collections
+- ✅ On configuration change: Cache is cleared
+
+**To force new collections:**
+- Use the API endpoint: `POST /RandomCollections/Refresh`
+- Or change the plugin configuration and save
 
 ### The Plugin Isn't in the Catalog
 
@@ -180,35 +208,70 @@ If you can't find the plugin in the Jellyfin catalog after adding the repository
 
 **Check the Logs:**
 1. Go to **Dashboard** → **Logs**
-2. Look for entries containing `RandomCollectionsHome` or `Auto-Collections-Random-Collections`
-3. Look for error messages that might explain the issue
+2. Look for entries containing `Jellyfin.Plugin.RandomCollectionsHome`
+3. The plugin now uses proper ILogger for comprehensive logging
+4. Look for error messages that might explain the issue
 
-**Common Error Messages:**
-- **"HomeScreenSections not found"** → Install the HomeScreenSections plugin
-- **"No collections available"** → Create at least one collection in your library
-- **"Permission denied"** → Check file permissions on the plugins folder
+**Common Log Messages:**
+- **"Found {Count} collections in library"** → Shows how many collections were detected
+- **"No collections found in library"** → Create at least one collection
+- **"Plugin instance is null"** → The plugin failed to initialize properly
+- **"Getting random collections for user {UserId}"** → Normal operation
 
 ---
 
+## API Usage
+
+### Endpoints
+
+**Get Random Collections**
+```
+GET /RandomCollections/Get
+```
+Returns a list of random collections for the authenticated user.
+
+Response:
+```json
+[
+  {
+    "id": "guid",
+    "name": "Collection Name",
+    "itemCount": 10
+  }
+]
+```
+
+**Get Collection Items**
+```
+GET /RandomCollections/Items/{collectionId}
+```
+Returns all items within a specific collection.
+
+**Refresh Collections**
+```
+POST /RandomCollections/Refresh
+```
+Clears the cache and forces new random collection selection on next request.
+
 ## Frequently Asked Questions
 
+**Q: How do I display collections on my home screen?**
+A: This plugin provides the API endpoints. You'll need to integrate them with your custom home screen implementation or use a compatible home screen plugin.
+
 **Q: How many collections should I configure?**
-A: Start with 3-5. Too many can make your home screen cluttered, too few might not showcase enough content.
+A: Start with 3-5. Adjust based on your needs and integration.
 
 **Q: Can I choose which collections to show?**
 A: Not currently - the plugin randomly selects from all your collections. This is by design to help you rediscover content.
 
 **Q: Will this work with movies and TV shows?**
-A: Yes! It works with any type of collection you create in Jellyfin.
+A: Yes! It works with any type of collection (BoxSet) you create in Jellyfin.
 
 **Q: Does this slow down my server?**
 A: No, it's very lightweight. The plugin uses smart caching to minimize performance impact.
 
-**Q: Can I make collections update more often?**
-A: Currently, collections have a 30% chance to refresh on each home screen reload. To manually force a refresh, restart your server.
-
 **Q: Will different users see different collections?**
-A: Yes! The plugin caches collections per user, so each user can have a different set of random collections.
+A: Yes! The plugin caches collections per user, so each user gets a different set of random collections.
 
 ---
 
@@ -253,7 +316,7 @@ If you encounter issues not covered in the troubleshooting section, please check
 
 ## Credits
 
-Based on the jellyfin-plugin-auto-collections project by KeksBombe.
+Based on the jellyfin-plugin-auto-collections project by KeksBombe and jellyfin-plugin-home-sections by IAmParadox27
 
 ## License
 
