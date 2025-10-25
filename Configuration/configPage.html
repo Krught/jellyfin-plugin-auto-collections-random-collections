@@ -58,10 +58,34 @@
                     gap: 10px;
                     margin-bottom: 10px;
                 }
+                .headerContainer {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 20px;
+                }
+                .helpButton {
+                    padding: 8px 16px;
+                    background-color: #00a4dc;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    text-decoration: none;
+                    display: inline-block;
+                    font-size: 14px;
+                    transition: background-color 0.2s;
+                }
+                .helpButton:hover {
+                    background-color: #0086b3;
+                }
             </style>
 
             <form id="randomCollectionsConfigForm">
-                <h1>Home Sections Random Collections Configuration</h1>
+                <div class="headerContainer">
+                    <h1 style="margin: 0;">Home Sections Random Collections Configuration</h1>
+                    <a href="https://github.com/Krught/jellyfin-plugin-home-sections-random-collections" target="_blank" class="helpButton">Help</a>
+                </div>
                 
                 <div class="inputContainer">
                     <label class="inputLabel" for="randomCount">Number of Random Collections:</label>

@@ -3,7 +3,7 @@
         "guid": "d9e7b57d-d417-4f0f-8ff9-4a6de3f42eab",
         "name": "Home Sections Random Collections",
         "overview": "Randomly displays collections on the Jellyfin home screen",
-        "description": "Adds random collections to your home screen. Access random collections via the API endpoint. Configurable number of collections with per-user caching to reduce frequent changes. Includes comprehensive logging for troubleshooting.",
+        "description": "Adds random collections to your home screen. Access random collections via the API endpoint. Configurable number of collections with caching to reduce frequent changes. Includes comprehensive logging for troubleshooting.",
         "owner": "Krught",
         "imageUrl": "https://raw.githubusercontent.com/Krught/jellyfin-plugin-home-sections-random-collections/main/logo.png",
         "category": "General",
