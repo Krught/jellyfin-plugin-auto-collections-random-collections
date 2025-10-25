@@ -65,9 +65,10 @@
                 
                 <div class="inputContainer">
                     <label class="inputLabel" for="randomCount">Number of Random Collections:</label>
-                    <input is="emby-input" type="number" id="randomCount" name="randomCount" min="1" value="3" />
+                    <input is="emby-input" type="number" id="randomCount" name="randomCount" min="1" max="100" value="3" />
                     <div class="fieldDescription">
                         The number of random collections to return via the API (default is 3).
+                        The maximum number of collections is 100.
                     </div>
                 </div>
 
@@ -130,18 +131,25 @@
                 </div>
                 
                 <div id="debugSection" class="debugSection">
-                    <h3>Current Sections Debug Info</h3>
-                    <div id="debugContent">
-                        <p style="opacity: 0.7;">Click "Load Debug Info" to see current sections...</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;">Current Sections Debug Info</h3>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <label style="font-size: 0.9em; opacity: 0.8;">Refresh Interval (seconds):</label>
+                            <input is="emby-input" type="number" id="debugRefreshInterval" min="5" max="300" value="60" style="width: 80px;" onchange="updateRefreshInterval()" />
+                            <span id="refreshTimer" style="font-size: 0.9em; opacity: 0.8;"></span>
+                        </div>
                     </div>
-                    <button is="emby-button" type="button" class="raised" style="margin-top: 10px;" onclick="loadDebugInfo()">
-                        <span>Load Debug Info</span>
-                    </button>
+                    <div id="debugContent">
+                        <p style="opacity: 0.7;">Loading sections...</p>
+                    </div>
                 </div>
             </form>
 
             <script type="text/javascript">
                 var pluginId = "d9e7b57d-d417-4f0f-8ff9-4a6de3f42eab";
+                var debugRefreshIntervalId = null;
+                var debugCountdownIntervalId = null;
+                var debugSecondsRemaining = 0;
 
                 document.getElementById('randomCollectionsConfigForm').addEventListener('submit', function(e) {
                     e.preventDefault();
@@ -157,6 +165,18 @@
                         document.getElementById('useLandscape').checked = config.UseLandscape !== false; // default true
                         document.getElementById('collectionLimit').value = config.CollectionLimit || 20;
                         document.getElementById('collectionUpdateInterval').value = config.CollectionUpdateInterval || 1440;
+                        
+                        // Load developer mode settings
+                        var developerMode = config.DeveloperMode || false;
+                        var debugRefreshInterval = config.DebugRefreshInterval || 60;
+                        
+                        document.getElementById('developerMode').checked = developerMode;
+                        document.getElementById('debugRefreshInterval').value = debugRefreshInterval;
+                        
+                        // If developer mode was previously enabled, activate it
+                        if (developerMode) {
+                            toggleDeveloperMode();
+                        }
                     }).catch(function(error) {
                         console.error('Error loading settings:', error);
                     });
@@ -171,6 +191,8 @@
                     var useLandscape = document.getElementById('useLandscape').checked;
                     var collectionLimit = parseInt(document.getElementById('collectionLimit').value);
                     var collectionUpdateInterval = parseInt(document.getElementById('collectionUpdateInterval').value);
+                    var developerMode = document.getElementById('developerMode').checked;
+                    var debugRefreshInterval = parseInt(document.getElementById('debugRefreshInterval').value);
                     
                     if (randomCount < 1) {
                         Dashboard.hideLoadingMsg();
@@ -206,6 +228,8 @@
                         config.UseLandscape = useLandscape;
                         config.CollectionLimit = collectionLimit;
                         config.CollectionUpdateInterval = collectionUpdateInterval;
+                        config.DeveloperMode = developerMode;
+                        config.DebugRefreshInterval = debugRefreshInterval;
                         
                         ApiClient.updatePluginConfiguration(pluginId, config).then(function(result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
@@ -243,9 +267,84 @@
                     
                     if (isChecked) {
                         debugSection.classList.add('visible');
+                        // Auto-load sections when developer mode is enabled
+                        loadDebugInfo();
+                        startDebugRefresh();
                     } else {
                         debugSection.classList.remove('visible');
+                        stopDebugRefresh();
                     }
+                    
+                    // Save developer mode state to configuration
+                    saveDeveloperModeSettings();
+                }
+                
+                function startDebugRefresh() {
+                    stopDebugRefresh(); // Clear any existing intervals
+                    
+                    var intervalSeconds = parseInt(document.getElementById('debugRefreshInterval').value) || 60;
+                    debugSecondsRemaining = intervalSeconds;
+                    
+                    // Start countdown timer
+                    debugCountdownIntervalId = setInterval(function() {
+                        debugSecondsRemaining--;
+                        updateTimerDisplay();
+                        
+                        if (debugSecondsRemaining <= 0) {
+                            loadDebugInfo();
+                            debugSecondsRemaining = intervalSeconds;
+                        }
+                    }, 1000);
+                    
+                    updateTimerDisplay();
+                }
+                
+                function stopDebugRefresh() {
+                    if (debugRefreshIntervalId) {
+                        clearInterval(debugRefreshIntervalId);
+                        debugRefreshIntervalId = null;
+                    }
+                    if (debugCountdownIntervalId) {
+                        clearInterval(debugCountdownIntervalId);
+                        debugCountdownIntervalId = null;
+                    }
+                    document.getElementById('refreshTimer').textContent = '';
+                }
+                
+                function updateTimerDisplay() {
+                    var timerElement = document.getElementById('refreshTimer');
+                    if (timerElement) {
+                        timerElement.textContent = debugSecondsRemaining + 's until update';
+                    }
+                }
+                
+                function updateRefreshInterval() {
+                    // If developer mode is active, restart the refresh with the new interval
+                    if (document.getElementById('developerMode').checked) {
+                        startDebugRefresh();
+                    }
+                    
+                    // Save refresh interval to configuration
+                    saveDeveloperModeSettings();
+                }
+                
+                function saveDeveloperModeSettings() {
+                    // Silently save developer mode settings without showing loading/status messages
+                    var developerMode = document.getElementById('developerMode').checked;
+                    var debugRefreshInterval = parseInt(document.getElementById('debugRefreshInterval').value) || 60;
+                    
+                    ApiClient.getPluginConfiguration(pluginId).then(function(config) {
+                        config.DeveloperMode = developerMode;
+                        config.DebugRefreshInterval = debugRefreshInterval;
+                        
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function(result) {
+                            // Settings saved silently
+                        }).catch(function(error) {
+                            console.error('Error saving developer mode settings:', error);
+                        });
+                    }).catch(function(error) {
+                        console.error('Error getting config for developer mode settings:', error);
+                    });
                 }
 
                 function rerandomizeSections() {
@@ -272,6 +371,11 @@
                 function loadDebugInfo() {
                     var debugContent = document.getElementById('debugContent');
                     debugContent.innerHTML = '<p style="opacity: 0.7;">Loading debug information...</p>';
+                    
+                    // Reset the countdown timer
+                    var intervalSeconds = parseInt(document.getElementById('debugRefreshInterval').value) || 60;
+                    debugSecondsRemaining = intervalSeconds;
+                    updateTimerDisplay();
                     
                     ApiClient.fetch({
                         type: 'GET',

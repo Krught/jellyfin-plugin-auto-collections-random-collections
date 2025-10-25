@@ -1,17 +1,22 @@
 # Home Sections Random Collections
 
+
+<p align="center">
+  <img src="logo.png" alt="Home Sections Random Collections Logo" width="100%"/>
+</p>
+
+
 A Jellyfin plugin that randomly displays collections on your home screen, keeping your content fresh and interesting every time you visit!
 
 ## What Does This Plugin Do?
 
-This plugin automatically selects random collections from your library and displays them on your Jellyfin home screen. Each time you reload the home screen or restart your server, you'll see different collections, helping you rediscover content in your library.
+This plugin automatically selects random collections from your library and displays them on your Jellyfin home screen. An admin configurable setting allows you to change how often categories are updated, you'll see different collections, helping you rediscover content in your library.
 
 ## Features
 
 - 🎲 Randomly displays collections accessible via API
-- ⚙️ Configurable - choose how many collections to show
+- ⚙️ Configurable - choose how many collections to show, how long to show collections, and what display type they appear in
 - 🔄 Auto-refreshes with smart caching
-- 👤 Per-user random collection selection  
 - 🎨 Beautiful, easy-to-use configuration interface
 - 📊 REST API endpoints for integration
 - 🔍 Comprehensive logging for troubleshooting
@@ -19,7 +24,7 @@ This plugin automatically selects random collections from your library and displ
 ## Requirements
 
 - Jellyfin Server **10.9.0 or higher**
-- **HomeScreenSections Plugin** (required for displaying sections on home screen)
+- **HomeScreenSections Plugin** (required for displaying sections on home screen) - [GitHub Repository](https://github.com/IAmParadox27/jellyfin-plugin-home-sections/tree/main)
 
 ---
 
@@ -269,8 +274,6 @@ A: Yes! It works with any type of collection (BoxSet) you create in Jellyfin.
 **Q: Does this slow down my server?**
 A: No, it's very lightweight. The plugin uses smart caching to minimize performance impact.
 
-**Q: Will different users see different collections?**
-A: Yes! The plugin caches collections per user, so each user gets a different set of random collections.
 
 ---
 
@@ -313,9 +316,6 @@ dotnet --version
 
 If you encounter issues not covered in the troubleshooting section, please check the project repository for additional help or to report bugs.
 
-## Credits
-
-Based on the jellyfin-plugin-auto-collections project by KeksBombe and jellyfin-plugin-home-sections by IAmParadox27
 
 ## License
 

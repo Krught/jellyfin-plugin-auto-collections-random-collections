@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using MediaBrowser.Common.Configuration;
@@ -19,7 +20,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Jellyfin.Plugin.RandomCollectionsHome
 {
-    public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
+    public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages, IDisposable
     {
         public override string Name => "Home Sections Random Collections";
         public override Guid Id => Guid.Parse("d9e7b57d-d417-4f0f-8ff9-4a6de3f42eab");
@@ -30,7 +31,10 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
         private readonly IDtoService _dtoService;
         private readonly ILogger<Plugin> _logger;
         private readonly Dictionary<Guid, List<Guid>> _userCache = new Dictionary<Guid, List<Guid>>();
+        private readonly Dictionary<Guid, DateTime> _userCacheTimestamps = new Dictionary<Guid, DateTime>();
+        private readonly Dictionary<Guid, List<RegisteredSectionInfo>> _registeredSectionsCache = new Dictionary<Guid, List<RegisteredSectionInfo>>();
         private readonly object _cacheLock = new object();
+        private Timer? _updateTimer;
 
         public static Plugin? Instance { get; private set; }
 
@@ -77,10 +81,76 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
                     _logger.LogInformation("HomeScreenSections is ready, starting section registration");
                     await RegisterSectionsWithRetry(Guid.Empty);
                 });
+                
+                // Start the periodic update timer
+                StartUpdateTimer();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error initializing plugin");
+            }
+        }
+        
+        private void StartUpdateTimer()
+        {
+            // Stop existing timer if any
+            _updateTimer?.Dispose();
+            
+            // Check every minute if any user cache needs updating
+            var checkInterval = TimeSpan.FromMinutes(1);
+            
+            _logger.LogInformation("Starting update timer with check interval of {Interval} minutes. Collections will update every {UpdateInterval} minutes.",
+                checkInterval.TotalMinutes, Configuration.CollectionUpdateInterval);
+            
+            _updateTimer = new Timer(
+                callback: _ => CheckAndUpdateExpiredCaches(),
+                state: null,
+                dueTime: checkInterval,
+                period: checkInterval
+            );
+        }
+        
+        private void CheckAndUpdateExpiredCaches()
+        {
+            try
+            {
+                var updateIntervalMinutes = Configuration.CollectionUpdateInterval;
+                if (updateIntervalMinutes <= 0)
+                {
+                    _logger.LogDebug("Update interval is disabled (set to {Interval}), skipping cache check", updateIntervalMinutes);
+                    return;
+                }
+                
+                var now = DateTime.UtcNow;
+                var usersToUpdate = new List<Guid>();
+                
+                lock (_cacheLock)
+                {
+                    foreach (var kvp in _userCacheTimestamps)
+                    {
+                        var userId = kvp.Key;
+                        var lastUpdate = kvp.Value;
+                        var elapsed = now - lastUpdate;
+                        
+                        if (elapsed.TotalMinutes >= updateIntervalMinutes)
+                        {
+                            usersToUpdate.Add(userId);
+                            _logger.LogInformation("User {UserId} cache expired after {Elapsed} minutes (interval: {Interval} minutes)", 
+                                userId, elapsed.TotalMinutes, updateIntervalMinutes);
+                        }
+                    }
+                }
+                
+                // Update expired caches outside the lock
+                foreach (var userId in usersToUpdate)
+                {
+                    _logger.LogInformation("Auto-updating collections for user {UserId}", userId);
+                    ClearCacheAndReregister(userId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking and updating expired caches");
             }
         }
 
@@ -94,14 +164,26 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
             // Update handler configuration
             RandomCollectionsHandler.SetConfiguration(Configuration);
             
-            // Clear cache when configuration changes
+            // Clear all caches when configuration changes
             lock (_cacheLock)
             {
                 _userCache.Clear();
+                _userCacheTimestamps.Clear();
+                _registeredSectionsCache.Clear();
             }
+            
+            // Restart timer with new interval
+            StartUpdateTimer();
             
             // Re-register sections with new count
             Task.Run(async () => await RegisterSectionsWithRetry(Guid.Empty));
+        }
+        
+        public void Dispose()
+        {
+            _updateTimer?.Dispose();
+            _updateTimer = null;
+            GC.SuppressFinalize(this);
         }
 
         private List<BaseItem> GetAllCollections()
@@ -133,34 +215,45 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
                 _logger.LogDebug("Getting {Count} random collections from {Total} total collections for user {UserId}", 
                     count, collections.Count, userId);
                 
-                // Get cached collections for this user if they exist
+                // Check if cache exists
+                // NOTE: Expiration is handled by the timer (CheckAndUpdateExpiredCaches), not here
+                // This prevents duplicate expiration logic and ensures proper re-registration
                 List<Guid>? cachedCollectionIds = null;
+                
                 lock (_cacheLock)
                 {
+                    // Check if cache exists with correct count
                     if (_userCache.TryGetValue(userId, out var cached) && cached.Count == count)
                     {
                         cachedCollectionIds = cached;
+                        
+                        // Log cache age for debugging
+                        if (_userCacheTimestamps.TryGetValue(userId, out var lastUpdate))
+                        {
+                            var elapsed = DateTime.UtcNow - lastUpdate;
+                            _logger.LogDebug("Using cached collections for user {UserId} (age: {Age} minutes, interval: {Interval} minutes)", 
+                                userId, elapsed.TotalMinutes, Configuration.CollectionUpdateInterval);
+                        }
                     }
                 }
 
-                // If we have cached collections and random chance (prevents too frequent changes)
-                if (cachedCollectionIds != null && random.NextDouble() > 0.3) // 70% chance to use cache
+                // Return cached collections if available
+                if (cachedCollectionIds != null)
                 {
-                    _logger.LogDebug("Using cached collections for user {UserId}", userId);
-                    // Use cached collections
                     return collections.Where(c => c != null && cachedCollectionIds.Contains(c.Id)).ToList();
                 }
                 else
                 {
-                    // Pick new random collections
+                    // No cache exists or count changed - pick new random collections
                     var randomCollections = collections.OrderBy(x => random.Next()).Take(count).ToList();
                     
                     _logger.LogInformation("Selected {Count} new random collections for user {UserId}", randomCollections.Count, userId);
                     
-                    // Cache the new selection
+                    // Cache the new selection with timestamp
                     lock (_cacheLock)
                     {
                         _userCache[userId] = randomCollections.Select(c => c.Id).ToList();
+                        _userCacheTimestamps[userId] = DateTime.UtcNow;
                     }
                     
                     return randomCollections;
@@ -179,7 +272,20 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
             
             lock (_cacheLock)
             {
-                _userCache.Clear();
+                if (userId == Guid.Empty)
+                {
+                    // Clear all caches
+                    _userCache.Clear();
+                    _userCacheTimestamps.Clear();
+                    _registeredSectionsCache.Clear();
+                }
+                else
+                {
+                    // Clear specific user cache
+                    _userCache.Remove(userId);
+                    _userCacheTimestamps.Remove(userId);
+                    _registeredSectionsCache.Remove(userId);
+                }
             }
             
             Task.Run(async () => await RegisterSectionsWithRetry(userId));
@@ -187,6 +293,20 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
 
         public List<object> GetCurrentSections(Guid userId)
         {
+            // Return the cached registered sections to show what's actually registered
+            lock (_cacheLock)
+            {
+                if (_registeredSectionsCache.TryGetValue(userId, out var cachedSections))
+                {
+                    _logger.LogDebug("Returning {Count} cached registered sections for user {UserId}", cachedSections.Count, userId);
+                    return cachedSections.Cast<object>().ToList();
+                }
+            }
+            
+            // If no cache exists, fall back to calculating from current collections
+            // This shouldn't normally happen but provides a fallback
+            _logger.LogWarning("No registered sections cache found for user {UserId}, calculating from current collections", userId);
+            
             var collections = GetRandomCollections(userId);
             var result = new List<object>();
             
@@ -448,6 +568,26 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
                 sectionIndex++;
             }
 
+            // Cache the registered sections for the debug endpoint
+            lock (_cacheLock)
+            {
+                var registeredSections = sectionsToUpdate.Select(s => 
+                {
+                    var collection = collections.FirstOrDefault(c => c.Id == s.collectionId);
+                    return new RegisteredSectionInfo
+                    {
+                        SectionId = s.sectionId,
+                        CollectionName = s.collectionName,
+                        CollectionId = s.collectionId,
+                        ViewMode = s.viewMode,
+                        ItemCount = collection != null ? GetItemCount(collection) : 0
+                    };
+                }).ToList();
+                
+                _registeredSectionsCache[userId] = registeredSections;
+                _logger.LogInformation("Cached {Count} registered sections for user {UserId}", registeredSections.Count, userId);
+            }
+
             // Update all sections in the XML config file in one operation
             if (sectionsToUpdate.Count > 0)
             {
@@ -571,5 +711,14 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
                 }
             };
         }
+    }
+
+    public class RegisteredSectionInfo
+    {
+        public string SectionId { get; set; } = string.Empty;
+        public string CollectionName { get; set; } = string.Empty;
+        public Guid CollectionId { get; set; }
+        public string ViewMode { get; set; } = string.Empty;
+        public int ItemCount { get; set; }
     }
 }

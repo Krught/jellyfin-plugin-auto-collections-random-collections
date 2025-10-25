@@ -14,6 +14,10 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
         // Collection settings
         public int CollectionLimit { get; set; } = 20;
         public int CollectionUpdateInterval { get; set; } = 1440; // 24 hours in minutes
+        
+        // Developer mode settings
+        public bool DeveloperMode { get; set; } = false;
+        public int DebugRefreshInterval { get; set; } = 60; // Default 60 seconds
     }
 }
 
