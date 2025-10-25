@@ -545,7 +545,7 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
                     ["id"] = uniqueId,
                     ["displayText"] = collection.Name,
                     ["limit"] = 1,
-                    ["route"] = $"/web/index.html#!/details?id={collection.Id}",
+                    // ["route"] = uniqueId,
                     ["additionalData"] = collection.Id,
                     ["resultsEndpoint"] = collection.Name,
                     ["resultsAssembly"] = typeof(RandomCollectionsHandler).Assembly.FullName,
@@ -600,8 +600,15 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
         private string ConvertNumberToWord(int number)
         {
             var words = new[] { "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN",
-                              "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN", "SEVENTEEN", "EIGHTEEN", "NINETEEN", "TWENTY" };
-            
+                              "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN", "SEVENTEEN", "EIGHTEEN", "NINETEEN", "TWENTY",
+                              "TWENTYONE", "TWENTYTWO", "TWENTYTHREE", "TWENTYFOUR", "TWENTYFIVE", "TWENTYSIX", "TWENTYSEVEN", "TWENTYEIGHT", "TWENTYNINE", "THIRTY",
+                              "THIRTYONE", "THIRTYTWO", "THIRTYTHREE", "THIRTYFOUR", "THIRTYFIVE", "THIRTYSIX", "THIRTYSEVEN", "THIRTYEIGHT", "THIRTYNINE", "FORTY",
+                              "FORTYONE", "FORTYTWO", "FORTYTHREE", "FORTYFOUR", "FORTYFIVE", "FORTYSIX", "FORTYSEVEN", "FORTYEIGHT", "FORTYNINE", "FIFTY",
+                              "FIFTYONE", "FIFTYTWO", "FIFTYTHREE", "FIFTYFOUR", "FIFTYFIVE", "FIFTYSIX", "FIFTYSEVEN", "FIFTYEIGHT", "FIFTYNINE", "SIXTY",
+                              "SIXTYONE", "SIXTYTWO", "SIXTYTHREE", "SIXTYFOUR", "SIXTYFIVE", "SIXTYSIX", "SIXTYSEVEN", "SIXTYEIGHT", "SIXTYNINE", "SEVENTY",
+                              "SEVENTYONE", "SEVENTYTWO", "SEVENTYTHREE", "SEVENTYFOUR", "SEVENTYFIVE", "SEVENTYSIX", "SEVENTYSEVEN", "SEVENTYEIGHT", "SEVENTYNINE", "EIGHTY",
+                              "EIGHTYONE", "EIGHTYTWO", "EIGHTYTHREE", "EIGHTYFOUR", "EIGHTYFIVE", "EIGHTYSIX", "EIGHTYSEVEN", "EIGHTYEIGHT", "EIGHTYNINE", "NINETY",
+                              "NINETYONE", "NINETYTWO", "NINETYTHREE", "NINETYFOUR", "NINETYFIVE", "NINETYSIX", "NINETYSEVEN", "NINETYEIGHT", "NINETYNINE", "ONEHUNDRED" };
             if (number >= 1 && number <= words.Length)
             {
                 return words[number - 1];
@@ -704,6 +711,7 @@ namespace Jellyfin.Plugin.RandomCollectionsHome
         {
             return new[]
             {
+                // Configuration page
                 new PluginPageInfo
                 {
                     Name = this.Name,

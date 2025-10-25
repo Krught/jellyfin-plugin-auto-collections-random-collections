@@ -10,16 +10,17 @@ A Jellyfin plugin that randomly displays collections on your home screen, keepin
 
 ## What Does This Plugin Do?
 
-This plugin automatically selects random collections from your library and displays them on your Jellyfin home screen. An admin configurable setting allows you to change how often categories are updated, you'll see different collections, helping you rediscover content in your library.
+This plugin automatically selects random collections from your library and displays them on your Jellyfin home screen. Collections are cached and automatically refreshed at a configurable interval (default: 24 hours), helping you rediscover content in your library.
 
 ## Features
 
-- 🎲 Randomly displays collections accessible via API
-- ⚙️ Configurable - choose how many collections to show, how long to show collections, and what display type they appear in
-- 🔄 Auto-refreshes with smart caching
+- 🎲 Randomly displays collections on your home screen
+- ⚙️ Configurable - choose how many collections to show, update interval, item limits, and display types
+- 🔄 Automatic refresh based on configurable interval
 - 🎨 Beautiful, easy-to-use configuration interface
 - 📊 REST API endpoints for integration
 - 🔍 Comprehensive logging for troubleshooting
+- 🌐 Instance-level (all users see the same collections)
 
 ## Requirements
 
@@ -80,7 +81,7 @@ Now install this plugin:
    - ✅ **Home Sections Random Collections**
 3. If either shows as disabled, click on it, enable it, and restart again
 
-#### Step 6: Configure the Plugin (Optional)
+#### Step 6: Configure the Plugin
 
 1. In **Dashboard** → **Plugins** → **My Plugins**
 2. Click on **Home Sections Random Collections**
@@ -111,23 +112,52 @@ Now install this plugin:
 2. Go to **Dashboard** → **Plugins** → **My Plugins**
 3. Click on **Home Sections Random Collections**
 4. Adjust the settings (see below)
-5. Click **Save**
-6. **Restart your server** for changes to take effect
+5. Click **Save** to apply changes
+6. **Note:** Changes to settings will clear the cache and immediately select new random collections
+
+**Quick Actions:**
+- **Rerandomize Sections** button: Instantly selects new random collections without changing settings
+- **Developer Mode** checkbox: Toggle debug information display on/off
 
 ### Available Settings
 
 **Number of Random Collections**
-- Controls how many random collections are returned by the API
+- Controls how many random collections are displayed on the home screen
 - Default: 3
-- Example: If set to 5, the API will return 5 different random collections for each user
+- Range: 1-100 collections
 
-### When Do Collections Update?
+**View Mode Options**
+- Choose which display types are available: Portrait, Square, Landscape
+- If only one is selected, all collections will use that mode
+- If multiple are selected, each collection will randomly use one of the enabled modes
+- All three enabled by default
+- **Note:** At least one view mode must be selected
 
-Collections use smart caching per user:
-- **70% of the time**: Cached collections are returned (prevents excessive randomization)
-- **30% of the time**: New random collections are selected
-- **On configuration change**: Cache is cleared and new collections are selected
-- **Manual refresh**: Use the `/RandomCollections/Refresh` endpoint
+**Collection Items**
+- Controls how many items from each collection are displayed on the home screen
+- This is the number of movies/shows visible in each collection section
+- Default: 20 items per collection
+- Set to 0 to display all items from each collection
+
+**Collection Update Interval**
+- Controls how often collections are automatically refreshed (in minutes)
+- Default: 1440 minutes (24 hours)
+- Set to 0 to disable automatic updates
+- When this interval expires, new random collections are automatically selected
+
+**Developer Mode** (Advanced)
+- When enabled, shows debug information about currently registered sections
+- Displays Section ID, Collection Name, Collection ID, View Mode, and Item Count for each section
+- Auto-refreshes debug info at a configurable interval (5-300 seconds, default: 60 seconds)
+- Useful for troubleshooting and verifying which collections are currently displayed
+- Does not affect plugin operation, only displays debug information
+
+### How Caching Works
+
+Collections are cached at the Jellyfin instance level:
+- **Automatic refresh**: New random collections are selected after the configured interval (default: 24 hours)
+- **On configuration change**: Cache is cleared and new collections are selected immediately
+- **Manual refresh**: Use the `/RandomCollections/Refresh` API endpoint to force an update
 
 ---
 
@@ -173,14 +203,16 @@ Collections use smart caching per user:
 
 ### Collections Aren't Changing
 
-This is normal behavior! The plugin uses smart caching:
-- ✅ 70% of the time: Returns cached collections (consistent experience)
-- ✅ 30% of the time: Selects new random collections
-- ✅ On configuration change: Cache is cleared
+This is normal behavior! Collections are cached for the configured update interval:
+- ✅ Collections update automatically based on the **Collection Update Interval** setting (default: 24 hours)
+- ✅ This provides a consistent experience and reduces server load
+- ✅ All users see the same collections (instance-level, not per-user)
 
-**To force new collections:**
-- Use the API endpoint: `POST /RandomCollections/Refresh`
-- Or change the plugin configuration and save
+**To force new collections immediately:**
+- Click the **Rerandomize Sections** button in the plugin settings page
+- Or use the API endpoint: `POST /RandomCollections/Refresh`
+- Or change any plugin setting and save (this clears the cache)
+- Or adjust the **Collection Update Interval** to refresh more frequently
 
 ### The Plugin Isn't in the Catalog
 
@@ -219,8 +251,8 @@ If you can't find the plugin in the Jellyfin catalog after adding the repository
 **Common Log Messages:**
 - **"Found {Count} collections in library"** → Shows how many collections were detected
 - **"No collections found in library"** → Create at least one collection
-- **"Plugin instance is null"** → The plugin failed to initialize properly
-- **"Getting random collections for user {UserId}"** → Normal operation
+- **"Successfully registered section for collection '{CollectionName}'"** → Collection added to home screen
+- **"Auto-updating collections for user {UserId}"** → Collections being refreshed after interval expires
 
 ---
 
@@ -232,7 +264,7 @@ If you can't find the plugin in the Jellyfin catalog after adding the repository
 ```
 GET /RandomCollections/Get
 ```
-Returns a list of random collections for the authenticated user.
+Returns the list of currently displayed random collections (same for all users on the Jellyfin instance).
 
 Response:
 ```json
@@ -255,15 +287,34 @@ Returns all items within a specific collection.
 ```
 POST /RandomCollections/Refresh
 ```
-Clears the cache and forces new random collection selection on next request.
+Clears the cache and forces new random collection selection immediately.
+
+**Get Debug Information**
+```
+GET /RandomCollections/Debug/Sections
+```
+Returns detailed debug information about currently registered sections (used by Developer Mode).
+
+Response:
+```json
+[
+  {
+    "SectionId": "RANDOMONE",
+    "CollectionName": "Collection Name",
+    "CollectionId": "guid",
+    "ViewMode": "Portrait",
+    "ItemCount": 15
+  }
+]
+```
 
 ## Frequently Asked Questions
 
 **Q: How do I display collections on my home screen?**
-A: This plugin provides the API endpoints. You'll need to integrate them with your custom home screen implementation or use a compatible home screen plugin.
+A: You need to install the **HomeScreenSections** plugin. This plugin automatically registers sections with HomeScreenSections to display random collections on your home screen.
 
 **Q: How many collections should I configure?**
-A: Start with 3-5. Adjust based on your needs and integration.
+A: Start with 3-5. You can adjust the "Number of Random Collections" setting based on your preference.
 
 **Q: Can I choose which collections to show?**
 A: Not currently - the plugin randomly selects from all your collections. This is by design to help you rediscover content.
@@ -272,7 +323,16 @@ A: Not currently - the plugin randomly selects from all your collections. This i
 A: Yes! It works with any type of collection (BoxSet) you create in Jellyfin.
 
 **Q: Does this slow down my server?**
-A: No, it's very lightweight. The plugin uses smart caching to minimize performance impact.
+A: No, it's very lightweight. The plugin uses caching to minimize performance impact, only refreshing at the configured interval.
+
+**Q: Are collections different for each user?**
+A: No, collections are selected at the Jellyfin instance level. All users see the same random collections that update at the configured interval.
+
+**Q: How many items from each collection are shown?**
+A: This is controlled by the **Collection Items** setting (default: 20). This determines how many movies/shows are displayed in each collection section on your home screen. Set it to 0 to show all items from each collection.
+
+**Q: How do I see which collections are currently displayed?**
+A: Enable **Developer Mode** in the plugin settings. This will show debug information including Section ID, Collection Name, View Mode, and Item Count for each currently displayed collection.
 
 
 ---
